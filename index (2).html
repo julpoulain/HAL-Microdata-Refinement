@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Curation HAL</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.29.0/dist/tabler-icons.min.css">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+
+:root{
+  --bg:#F6F7F9;
+  --surface:#FFFFFF;
+  --border:#E5E7EB;
+  --border-strong:#D1D5DB;
+  --text:#111827;
+  --text-2:#6B7280;
+  --text-3:#9CA3AF;
+  --accent:#1D4ED8;
+  --accent-bg:#EFF6FF;
+  --radius:6px;
+  --sidebar:260px;
+
+  --danger-bg:#FEF2F2; --danger-text:#991B1B; --danger-border:#FECACA;
+  --warning-bg:#FFFBEB; --warning-text:#92400E; --warning-border:#FDE68A;
+  --info-bg:#EFF6FF;    --info-text:#1E40AF;   --info-border:#BFDBFE;
+  --success-bg:#F0FDF4; --success-text:#166534; --success-border:#BBF7D0;
+}
+
+body{font-family:'Inter',-apple-system,sans-serif;font-size:13px;color:var(--text);background:var(--bg);display:flex;height:100vh;overflow:hidden;}
+
+/* ── Sidebar ── */
+#sidebar{width:var(--sidebar);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow-y:auto;}
+
+.sb-logo{padding:18px 16px 14px;border-bottom:1px solid var(--border);}
+.sb-logo h1{font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px;margin-bottom:2px;}
+.sb-logo p{font-size:11px;color:var(--text-2);line-height:1.4;}
+
+.sb-section{padding:12px 16px;border-bottom:1px solid var(--border);}
+.sb-section > label{display:block;font-size:11px;font-weight:500;color:var(--text-2);margin-bottom:5px;}
+
+input[type=text],input[type=date]{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);font-family:inherit;font-size:13px;color:var(--text);background:var(--surface);outline:none;transition:border-color .15s;}
+input[type=text]:focus,input[type=date]:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(29,78,216,.1);}
+
+.date-row{display:flex;gap:8px;}
+.date-row > div{flex:1;}
+.date-row label{font-size:10px;color:var(--text-2);display:block;margin-bottom:3px;}
+
+.rules-list{display:flex;flex-direction:column;gap:5px;}
+.rule-item{display:flex;align-items:center;gap:8px;cursor:pointer;}
+.rule-item input[type=checkbox]{width:14px;height:14px;accent-color:var(--accent);cursor:pointer;flex-shrink:0;}
+.rule-item span{font-size:12px;display:flex;align-items:center;gap:5px;}
+.rule-item i{font-size:13px;}
+
+#btn-launch{margin:12px 16px;padding:9px;background:var(--accent);color:white;border:none;border-radius:var(--radius);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s;width:calc(100% - 32px);}
+#btn-launch:hover{background:#1e40af;}
+#btn-launch:disabled{background:#93c5fd;cursor:not-allowed;}
+
+.session-btns{display:flex;flex-direction:column;gap:6px;}
+.btn-sm{width:100%;padding:6px 10px;border:1px solid var(--border);border-radius:var(--radius);font-family:inherit;font-size:12px;cursor:pointer;background:var(--surface);color:var(--text);display:flex;align-items:center;gap:6px;transition:background .1s;}
+.btn-sm:hover{background:var(--bg);}
+
+@keyframes spin{to{transform:rotate(360deg);}}
+.spinning{animation:spin .8s linear infinite;display:inline-block;}
+
+/* ── Main ── */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+#topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;flex-shrink:0;}
+
+.stats{display:flex;gap:24px;}
+.stat-val{font-size:22px;font-weight:600;line-height:1;}
+.stat-lbl{font-size:10px;color:var(--text-2);margin-top:2px;}
+
+.topbar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-left:auto;}
+
+.only-flags-label{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2);cursor:pointer;white-space:nowrap;}
+.only-flags-label input{accent-color:var(--accent);}
+
+.pills-row{display:flex;gap:5px;flex-wrap:wrap;}
+
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:4px 9px;border-radius:20px;border:1px solid transparent;cursor:pointer;transition:opacity .15s;font-family:inherit;white-space:nowrap;}
+.pill.off{opacity:.3;}
+.pill i{font-size:12px;}
+
+#progress{height:2px;background:var(--accent);width:0%;transition:width .3s ease;flex-shrink:0;}
+#status{padding:5px 20px;font-size:11px;color:var(--text-2);background:var(--bg);border-bottom:1px solid var(--border);min-height:24px;flex-shrink:0;}
+
+/* ── Table ── */
+#table-wrap{flex:1;overflow-y:auto;}
+
+#empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-2);gap:8px;}
+#empty i{font-size:40px;color:var(--text-3);}
+
+table{width:100%;border-collapse:collapse;}
+
+thead th{position:sticky;top:0;z-index:10;background:var(--surface);padding:8px 10px;text-align:left;font-size:11px;font-weight:500;color:var(--text-2);border-bottom:1px solid var(--border);cursor:pointer;user-select:none;white-space:nowrap;}
+thead th:hover{color:var(--text);}
+thead th.asc::after{content:' ↑';color:var(--accent);}
+thead th.desc::after{content:' ↓';color:var(--accent);}
+thead th.no-sort{cursor:default;}
+
+.main-row{cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s;}
+.main-row:hover{background:#F9FAFB;}
+.main-row.open{background:#F9FAFB;border-bottom:none;}
+.main-row.done{opacity:.35;}
+
+.main-row td{padding:8px 10px;vertical-align:middle;}
+td.c-chev{width:28px;padding:8px 4px 8px 10px;}
+td.c-chev i{font-size:11px;color:var(--text-3);transition:transform .2s;}
+.main-row.open td.c-chev i{transform:rotate(90deg);}
+
+td.c-id{font-size:11px;font-family:'Courier New',monospace;color:var(--accent);white-space:nowrap;}
+td.c-titre{font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+td.c-type span{font-size:11px;background:var(--bg);border:1px solid var(--border);padding:2px 7px;border-radius:4px;}
+td.c-date{font-size:11px;color:var(--text-2);white-space:nowrap;}
+td.c-flags{white-space:nowrap;}
+td.c-act{text-align:right;padding-right:14px;white-space:nowrap;}
+
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:5px;margin-right:3px;white-space:nowrap;font-family:inherit;}
+.badge.danger{background:var(--danger-bg);color:var(--danger-text);}
+.badge.warning{background:var(--warning-bg);color:var(--warning-text);}
+.badge.info{background:var(--info-bg);color:var(--info-text);}
+.badge.success{background:var(--success-bg);color:var(--success-text);}
+
+.btn-done{font-size:11px;padding:4px 9px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);cursor:pointer;font-family:inherit;color:var(--text-2);display:inline-flex;align-items:center;gap:4px;transition:background .1s,color .1s,border-color .1s;}
+.btn-done:hover{background:var(--success-bg);color:var(--success-text);border-color:var(--success-border);}
+
+/* ── Detail panel ── */
+.detail-row td{padding:0;}
+.detail-panel{overflow:hidden;max-height:0;transition:max-height .25s ease;background:#FAFBFC;border-bottom:1px solid var(--border);}
+.detail-panel.open{max-height:500px;}
+.detail-inner{padding:12px 14px 14px 38px;}
+
+.detail-flags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;}
+.detail-flags .badge{font-size:12px;padding:4px 10px;}
+
+.doublon-box{background:var(--warning-bg);border:1px solid var(--warning-border);border-radius:var(--radius);padding:9px 12px;margin-bottom:10px;}
+.doublon-title{font-size:11px;font-weight:500;color:var(--warning-text);margin-bottom:5px;display:flex;align-items:center;gap:5px;}
+.doublon-item{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0;border-top:1px solid var(--warning-border);margin-top:3px;}
+.doublon-item a{color:var(--accent);text-decoration:none;font-size:11px;display:flex;align-items:center;gap:3px;}
+.doublon-item a:hover{text-decoration:underline;}
+
+.detail-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:12px;font-size:12px;}
+.meta-field label{font-size:10px;color:var(--text-2);display:block;margin-bottom:2px;font-weight:500;}
+.meta-field a{color:var(--accent);text-decoration:none;}
+.meta-field a:hover{text-decoration:underline;}
+
+.detail-actions{display:flex;gap:7px;padding-top:8px;border-top:1px solid var(--border);}
+.btn-action{padding:6px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);cursor:pointer;font-family:inherit;font-size:12px;color:var(--text);display:inline-flex;align-items:center;gap:5px;transition:background .1s;text-decoration:none;}
+.btn-action:hover{background:var(--bg);}
+.btn-action.primary{background:var(--accent);color:white;border-color:var(--accent);}
+.btn-action.primary:hover{background:#1e40af;}
+
+/* ── Footer ── */
+#footer{background:var(--surface);border-top:1px solid var(--border);padding:9px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+#footer-count{font-size:11px;color:var(--text-2);}
+#btn-export{font-size:12px;padding:6px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);cursor:pointer;font-family:inherit;color:var(--text);display:inline-flex;align-items:center;gap:5px;}
+#btn-export:hover{background:var(--bg);}
+#btn-export:disabled{opacity:.4;cursor:not-allowed;}
+</style>
+</head>
+<body>
+
+<aside id="sidebar">
+  <div class="sb-logo">
+    <h1><i class="ti ti-search"></i>Curation HAL</h1>
+    <p>Repérage automatique de problèmes sur les notices d'une collection</p>
+  </div>
+
+  <div class="sb-section">
+    <label for="inp-coll">Collection HAL</label>
+    <input type="text" id="inp-coll" value="UNIV-PARIS1" placeholder="ex : UNIV-PARIS1">
+  </div>
+
+  <div class="sb-section">
+    <label>Période</label>
+    <div class="date-row">
+      <div><label for="inp-from">Du</label><input type="date" id="inp-from"></div>
+      <div><label for="inp-to">Au</label><input type="date" id="inp-to"></div>
+    </div>
+  </div>
+
+  <div class="sb-section">
+    <label>Règles actives (calculées à l'analyse)</label>
+    <div class="rules-list" id="rules-list"></div>
+  </div>
+
+  <button id="btn-launch"><i class="ti ti-player-play"></i>Lancer l'analyse</button>
+
+  <div class="sb-section">
+    <label>Session</label>
+    <div class="session-btns">
+      <button class="btn-sm" id="btn-save"><i class="ti ti-download"></i>Sauvegarder les notices traitées</button>
+      <label class="btn-sm">
+        <i class="ti ti-upload"></i>Reprendre une session
+        <input type="file" id="inp-session" accept=".json" style="display:none;">
+      </label>
+    </div>
+  </div>
+</aside>
+
+<main id="main">
+  <div id="topbar">
+    <div class="stats">
+      <div><div class="stat-val" id="st-total">—</div><div class="stat-lbl">notices</div></div>
+      <div><div class="stat-val" id="st-flags">—</div><div class="stat-lbl">avec problème</div></div>
+      <div><div class="stat-val" id="st-done">0</div><div class="stat-lbl">traitées</div></div>
+    </div>
+    <div class="topbar-right">
+      <label class="only-flags-label">
+        <input type="checkbox" id="only-flags" checked>
+        Uniquement avec problème
+      </label>
+      <div class="pills-row" id="pills"></div>
+    </div>
+  </div>
+
+  <div id="progress"></div>
+  <div id="status"></div>
+
+  <div id="table-wrap">
+    <div id="empty">
+      <i class="ti ti-search"></i>
+      <span>Renseigne une collection et une période, puis lance l'analyse.</span>
+    </div>
+    <table id="tbl" style="display:none;">
+      <thead>
+        <tr>
+          <th class="no-sort" style="width:28px;"></th>
+          <th data-col="halId" style="width:130px;">HAL ID</th>
+          <th data-col="titre">Titre</th>
+          <th data-col="type" style="width:110px;">Type</th>
+          <th data-col="date" style="width:100px;">Date dépôt</th>
+          <th class="no-sort">Flags</th>
+          <th class="no-sort" style="width:80px;"></th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+
+  <div id="footer">
+    <span id="footer-count"></span>
+    <button id="btn-export" disabled><i class="ti ti-download"></i>Exporter CSV</button>
+  </div>
+</main>
+
+<script>
+// ── Constants ──────────────────────────────────────────────────────────────
+const API = 'https://api.archives-ouvertes.fr/search/';
+
+const DOC_LABELS = {
+  ART:'Article',COUV:'Chapitre',OUV:'Ouvrage',NOTICE:'Notice de dictionnaire',
+  COMM:'Communication',UNDEFINED:'Working Paper',IMG:'Image',
+  THESE:'Thèse',HDR:'HDR',POSTER:'Poster',REPORT:'Rapport',
+};
+
+const LANG_FLAGS = {fr:'🇫🇷',en:'🇬🇧',de:'🇩🇪',es:'🇪🇸',it:'🇮🇹',pt:'🇵🇹',nl:'🇳🇱',ru:'🇷🇺'};
+
+const LANG_WORDS = {
+  fr:['le','la','les','de','du','des','en','et','un','une','est','avec','dans','pour','sur','qui','que'],
+  en:['the','a','an','of','in','is','are','for','to','with','and','that','this','its','from','on'],
+  de:['der','die','das','ein','eine','und','ist','von','für','mit','im','zu','des','dem','den'],
+  es:['el','la','los','las','de','en','un','una','es','y','que','con','por','del','al','se'],
+  it:['il','la','le','di','un','una','e','che','con','per','del','al','gli','i','nel'],
+};
+
+const RULES = [
+  {id:'doi',       label:'DOI manquant',           sev:'danger',  icon:'ti-link-off'},
+  {id:'resume',    label:'Sans résumé',             sev:'warning', icon:'ti-file-off'},
+  {id:'editeur',   label:'Éditeur sci. (chapitres)',sev:'info',    icon:'ti-user-check'},
+  {id:'revue',     label:'Revue invalide',          sev:'danger',  icon:'ti-alert-triangle'},
+  {id:'affiliation',label:'Auteurs sans affiliation',sev:'warning',icon:'ti-users'},
+  {id:'doublon',   label:'Doublons potentiels',     sev:'warning', icon:'ti-copy'},
+  {id:'langue',    label:'Langue suspecte',         sev:'warning', icon:'ti-language'},
+];
+
+// ── State ──────────────────────────────────────────────────────────────────
+const S = {
+  results:[],
+  done:new Set(),
+  activeRules:new Set(RULES.map(r=>r.id)),
+  visibleRules:new Set(RULES.map(r=>r.id)),
+  onlyFlags:true,
+  openRow:null,
+  sortCol:'date',
+  sortDir:1,
+  collection:'',
+  running:false,
+};
+
+// ── Utils ──────────────────────────────────────────────────────────────────
+const arr = v => v == null ? [] : Array.isArray(v) ? v : [v];
+const first = v => arr(v)[0] ?? null;
+const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const sleep = ms => new Promise(r => setTimeout(r,ms));
+const halBase = id => (id||'').replace(/v\d+$/,'');
+
+function fmtDate(iso){
+  if(!iso) return '—';
+  const [y,m,d] = iso.slice(0,10).split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function detectLang(text){
+  if(!text||text.length<15) return null;
+  const words = text.toLowerCase().split(/\s+/);
+  let best=null, bestN=0;
+  for(const [lang,markers] of Object.entries(LANG_WORDS)){
+    const n = words.filter(w=>markers.includes(w)).length;
+    if(n>bestN){bestN=n;best=lang;}
+  }
+  return bestN>=2 ? best : null;
+}
+
+// ── Flagging ───────────────────────────────────────────────────────────────
+function flagNotice(doc){
+  const flags=[];
+  const type=doc.docType_s;
+  const add=(ruleId,sev,icon,text)=>flags.push({rule:ruleId,sev,icon,text});
+
+  if(S.activeRules.has('doi') && type==='ART'){
+    const doi=first(doc.doiId_s);
+    const inPress=doc.inPress_bool;
+    const isLaw=arr(doc.domain_s).some(d=>d.includes('shs.droit'));
+    if(!doi&&!inPress&&!isLaw){
+      const j=first(doc.journalTitle_s)||'revue inconnue';
+      add('doi','danger','ti-link-off',`DOI manquant (${j})`);
+    }
+  }
+
+  if(S.activeRules.has('resume') && type==='ART'){
+    const doi=first(doc.doiId_s);
+    const sub=first(doc.docSubType_s)||'';
+    if(doi && !doc.abstract_s && sub!=='BOOKREVIEW'){
+      add('resume','warning','ti-file-off','Article sans résumé (DOI disponible)');
+    }
+  }
+
+  if(S.activeRules.has('editeur') && type==='COUV'){
+    const eds=arr(doc.scientificEditor_s);
+    if(eds.length){
+      add('editeur','info','ti-user-check',`Éditeur scientifique : ${eds.join(', ')}`);
+    } else {
+      add('editeur','danger','ti-user-x','Éditeur scientifique absent');
+    }
+  }
+
+  if(S.activeRules.has('revue') && doc.journalValid_s==='INCOMING'){
+    add('revue','danger','ti-alert-triangle','Revue invalide (INCOMING)');
+  }
+
+  if(S.activeRules.has('affiliation')){
+    const all=arr(doc.authIdFormPerson_s);
+    const withAffil=new Set();
+    arr(doc.structHasAlphaAuthId_fs).forEach(e=>{
+      const m=e.match(/_JoinSep_([^_]+)_FacetSep_/);
+      if(m) withAffil.add(m[1]);
+    });
+    const without=all.filter(a=>!withAffil.has(a)).length;
+    if(without>0) add('affiliation','warning','ti-users',`${without} auteur(s) sans affiliation sur ${all.length}`);
+  }
+
+  if(S.activeRules.has('langue')){
+    const declared=first(doc.language_s);
+    const title=first(doc.title_s)||'';
+    if(declared && title.length>20){
+      const detected=detectLang(title);
+      if(detected && detected!==declared){
+        const df=LANG_FLAGS[declared]||declared;
+        const dt=LANG_FLAGS[detected]||detected;
+        add('langue','warning','ti-language',`Langue suspecte : déclarée ${df}, titre détecté ${dt}`);
+      }
+    }
+  }
+
+  return flags;
+}
+
+async function searchDuplicates(doc){
+  const doi=first(doc.doiId_s);
+  const title=first(doc.title_s)||'';
+  const base=halBase(doc.halId_s);
+  const qParts=[];
+  if(doi) qParts.push(`doiId_s:"${doi}"`);
+  if(title.length>10){
+    const words=title.replace(/[()":!?,;'\-]/g,'').split(/\s+/).slice(0,12).join(' ');
+    if(words) qParts.push(`title_t:(${words})`);
+  }
+  if(!qParts.length) return [];
+  try{
+    const url=`${API}?q=${encodeURIComponent(qParts.join(' OR '))}&fl=halId_s,title_s,doiId_s&wt=json&rows=30`;
+    const data=await(await fetch(url)).json();
+    const dupes=[];
+    for(const d of(data.response?.docs||[])){
+      if(halBase(d.halId_s||'')===base) continue;
+      const dDoi=first(d.doiId_s);
+      if(doi&&dDoi&&dDoi!==doi) continue;
+      dupes.push({halId:d.halId_s,title:first(d.title_s)||'',doi:dDoi});
+    }
+    return dupes;
+  }catch{return [];}
+}
+
+// ── HAL API fetch ──────────────────────────────────────────────────────────
+async function fetchDocs(coll, from, to, onProg){
+  const q=`releasedDate_tdate:[${from}T00:00:00Z TO ${to}T23:59:59Z]`;
+  const fq=`collCode_s:${coll}`;
+  let start=0, total=null, docs=[];
+  while(true){
+    const url=`${API}?q=${encodeURIComponent(q)}&fq=${encodeURIComponent(fq)}&fl=*&wt=json&rows=100&start=${start}`;
+    const resp=await fetch(url);
+    if(!resp.ok) throw new Error(`Erreur API HAL : ${resp.status}`);
+    const data=await resp.json();
+    total=data.response.numFound;
+    docs.push(...data.response.docs);
+    onProg(docs.length,total);
+    start+=100;
+    if(start>=total) break;
+    await sleep(150);
+  }
+  return docs;
+}
+
+// ── Analysis ───────────────────────────────────────────────────────────────
+async function runAnalysis(){
+  if(S.running) return;
+  S.running=true;
+
+  const coll=document.getElementById('inp-coll').value.trim();
+  const from=document.getElementById('inp-from').value;
+  const to=document.getElementById('inp-to').value;
+
+  if(!coll){alert('Merci d\'indiquer un code de collection.');S.running=false;return;}
+  if(!from||!to){alert('Merci d\'indiquer une période.');S.running=false;return;}
+  if(from>to){alert('La date de début doit être antérieure à la date de fin.');S.running=false;return;}
+
+  S.collection=coll;
+  S.results=[];
+  S.openRow=null;
+
+  const btn=document.getElementById('btn-launch');
+  btn.disabled=true;
+  btn.innerHTML='<i class="ti ti-refresh spinning"></i>Analyse en cours…';
+  setStatus('Récupération des notices…');
+  setProgress(0);
+  showTable(false);
+
+  try{
+    const rawDocs=await fetchDocs(coll,from,to,(n,tot)=>{
+      setStatus(`Récupération : ${n} / ${tot} notices`);
+      setProgress(n/tot*35);
+    });
+
+    // Dédoublonner sur halId_s
+    const seen=new Set();
+    const docs=rawDocs.filter(d=>{
+      const b=halBase(d.halId_s||d.docid||'');
+      if(seen.has(b)) return false;
+      seen.add(b); return true;
+    });
+
+    if(!docs.length){
+      setStatus('Aucune notice trouvée pour cette période et cette collection.');
+      setProgress(0);
+      S.running=false;
+      btn.disabled=false;
+      btn.innerHTML='<i class="ti ti-player-play"></i>Lancer l\'analyse';
+      return;
+    }
+
+    showTable(true);
+    setStatus(`Analyse de ${docs.length} notices…`);
+
+    for(let i=0;i<docs.length;i++){
+      const doc=docs[i];
+      const flags=flagNotice(doc);
+
+      let doublons=[];
+      if(S.activeRules.has('doublon')){
+        doublons=await searchDuplicates(doc);
+        if(doublons.length){
+          const def=RULES.find(r=>r.id==='doublon');
+          flags.push({rule:'doublon',sev:def.sev,icon:def.icon,text:`${doublons.length} doublon(s) potentiel(s)`});
+        }
+        await sleep(100);
+      }
+
+      S.results.push({
+        n:i+1,
+        halId:doc.halId_s||'',
+        titre:first(doc.title_s)||'',
+        type:DOC_LABELS[doc.docType_s]||doc.docType_s||'—',
+        date:(doc.releasedDate_tdate||'').slice(0,10),
+        flags,
+        doublons,
+        doc,
+      });
+
+      setStatus(`Analyse : ${i+1} / ${docs.length} notices`);
+      setProgress(35+((i+1)/docs.length)*65);
+      if((i+1)%5===0) renderTable();
+    }
+
+    setProgress(100);
+    setStatus(`Terminé — ${docs.length} notices analysées.`);
+    setTimeout(()=>{setProgress(0);document.getElementById('status').textContent='';},2000);
+    renderTable();
+
+  }catch(e){
+    setStatus(`Erreur : ${e.message}`);
+    console.error(e);
+  }
+
+  S.running=false;
+  btn.disabled=false;
+  btn.innerHTML='<i class="ti ti-player-play"></i>Lancer l\'analyse';
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function badgeHtml(f,lg=false){
+  const s=lg?'font-size:12px;padding:4px 10px;':'';
+  return `<span class="badge ${f.sev}" style="${s}"><i class="ti ${f.icon}"></i>${esc(f.text)}</span>`;
+}
+
+function renderTable(){
+  const tbody=document.getElementById('tbody');
+
+  let rows=[...S.results];
+
+  // Sort
+  rows.sort((a,b)=>{
+    const va=a[S.sortCol]||'',vb=b[S.sortCol]||'';
+    return S.sortDir*(va<vb?-1:va>vb?1:0);
+  });
+
+  // Filter done
+  const active=rows.filter(r=>!S.done.has(r.halId));
+  const display=S.onlyFlags?active.filter(r=>r.flags.length>0):active;
+  const doneRows=S.onlyFlags?[]:[...S.results].filter(r=>S.done.has(r.halId));
+
+  tbody.innerHTML='';
+
+  [...display,...doneRows].forEach(row=>{
+    const isDone=S.done.has(row.halId);
+    const isOpen=S.openRow===row.halId;
+    const visF=row.flags.filter(f=>S.visibleRules.has(f.rule));
+
+    // Main row
+    const tr=document.createElement('tr');
+    tr.className='main-row'+(isOpen?' open':'')+(isDone?' done':'');
+    tr.dataset.id=row.halId;
+
+    const flagsCell=isDone
+      ?'<span class="badge success"><i class="ti ti-check"></i>Traité</span>'
+      :(visF.length?visF.map(f=>badgeHtml(f)).join(''):'<span style="font-size:11px;color:var(--text-3);">—</span>');
+
+    const doneBtn=isDone
+      ?`<button class="btn-done undone-btn" data-id="${esc(row.halId)}" style="color:var(--text-3);"><i class="ti ti-rotate-clockwise"></i>Remettre</button>`
+      :`<button class="btn-done done-btn" data-id="${esc(row.halId)}"><i class="ti ti-check"></i>Traité</button>`;
+
+    tr.innerHTML=`
+      <td class="c-chev"><i class="ti ti-chevron-right"></i></td>
+      <td class="c-id">${esc(row.halId)}</td>
+      <td class="c-titre" title="${esc(row.titre)}">${esc(row.titre)||'—'}</td>
+      <td class="c-type"><span>${esc(row.type)}</span></td>
+      <td class="c-date">${fmtDate(row.date)}</td>
+      <td class="c-flags">${flagsCell}</td>
+      <td class="c-act">${doneBtn}</td>
+    `;
+    tr.addEventListener('click',e=>{
+      if(e.target.closest('.done-btn,.undone-btn')) return;
+      S.openRow=(S.openRow===row.halId)?null:row.halId;
+      renderTable();
+    });
+    tbody.appendChild(tr);
+
+    // Detail row
+    const detTr=document.createElement('tr');
+    detTr.className='detail-row';
+
+    const allFlags=row.flags.map(f=>badgeHtml(f,true)).join('');
+
+    const doublonHtml=row.doublons.length?`
+      <div class="doublon-box">
+        <div class="doublon-title"><i class="ti ti-copy"></i>${row.doublons.length} doublon(s) potentiel(s)</div>
+        ${row.doublons.map(d=>`
+          <div class="doublon-item">
+            <div><b>${esc(d.halId)}</b><br><span style="color:var(--text-2);font-size:11px;">${esc(d.title.slice(0,80))}</span></div>
+            <a href="https://hal.science/${esc(d.halId)}" target="_blank">Voir <i class="ti ti-external-link"></i></a>
+          </div>`).join('')}
+      </div>`:''  ;
+
+    const doc=row.doc;
+    const doi=first(doc.doiId_s);
+    const authors=arr(doc.authFullName_s).join(', ')||arr(doc.authLastName_s).join(', ')||'—';
+    const journal=first(doc.journalTitle_s)||first(doc.publicationTitle_s)||'—';
+    const lang=first(doc.language_s)||'—';
+
+    detTr.innerHTML=`<td colspan="7"><div class="detail-panel${isOpen?' open':''}">
+      <div class="detail-inner">
+        <div class="detail-flags">${allFlags||'<span style="font-size:12px;color:var(--text-2);">Aucun problème détecté</span>'}</div>
+        ${doublonHtml}
+        <div class="detail-meta">
+          <div class="meta-field"><label>Titre</label><span>${esc(row.titre)||'—'}</span></div>
+          <div class="meta-field"><label>Auteurs</label><span>${esc(authors)}</span></div>
+          <div class="meta-field"><label>DOI</label><span>${doi?`<a href="https://doi.org/${esc(doi)}" target="_blank">${esc(doi)}</a>`:'—'}</span></div>
+          <div class="meta-field"><label>Revue / éditeur</label><span>${esc(journal)}</span></div>
+          <div class="meta-field"><label>Langue déclarée</label><span>${esc(lang)}</span></div>
+          <div class="meta-field"><label>Date de dépôt</label><span>${fmtDate(row.date)}</span></div>
+        </div>
+        <div class="detail-actions">
+          <a class="btn-action" href="https://hal.science/${esc(row.halId)}" target="_blank"><i class="ti ti-external-link"></i>Voir sur HAL</a>
+          ${isDone
+            ?'<span class="badge success" style="font-size:12px;padding:5px 12px;"><i class="ti ti-check"></i>Traité</span>'
+            :`<button class="btn-action primary done-btn" data-id="${esc(row.halId)}"><i class="ti ti-check"></i>Marquer traité</button>`}
+        </div>
+      </div>
+    </div></td>`;
+    tbody.appendChild(detTr);
+  });
+
+  // Bind buttons
+  tbody.querySelectorAll('.done-btn').forEach(btn=>btn.addEventListener('click',e=>{
+    e.stopPropagation();
+    S.done.add(btn.dataset.id);
+    if(S.openRow===btn.dataset.id) S.openRow=null;
+    renderTable();
+    updateStats();
+  }));
+  tbody.querySelectorAll('.undone-btn').forEach(btn=>btn.addEventListener('click',e=>{
+    e.stopPropagation();
+    S.done.delete(btn.dataset.id);
+    renderTable();
+    updateStats();
+  }));
+
+  updateStats();
+}
+
+function updateStats(){
+  const tot=S.results.length;
+  const flags=S.results.filter(r=>r.flags.length>0).length;
+  document.getElementById('st-total').textContent=tot||'—';
+  document.getElementById('st-flags').textContent=flags||'—';
+  document.getElementById('st-done').textContent=S.done.size;
+  const disp=S.onlyFlags
+    ?S.results.filter(r=>r.flags.length>0&&!S.done.has(r.halId)).length
+    :S.results.filter(r=>!S.done.has(r.halId)).length;
+  document.getElementById('footer-count').textContent=tot?`${disp} notice(s) affichée(s) · ${S.done.size} traitée(s)`:'';
+  document.getElementById('btn-export').disabled=tot===0;
+}
+
+function setStatus(msg){document.getElementById('status').textContent=msg;}
+function setProgress(pct){document.getElementById('progress').style.width=pct+'%';}
+function showTable(v){
+  document.getElementById('tbl').style.display=v?'':'none';
+  document.getElementById('empty').style.display=v?'none':'flex';
+}
+
+// ── Pills ──────────────────────────────────────────────────────────────────
+function buildPills(){
+  const c=document.getElementById('pills');
+  c.innerHTML='';
+  const colors={danger:'background:var(--danger-bg);color:var(--danger-text);border-color:var(--danger-border);',warning:'background:var(--warning-bg);color:var(--warning-text);border-color:var(--warning-border);',info:'background:var(--info-bg);color:var(--info-text);border-color:var(--info-border);'};
+  RULES.forEach(r=>{
+    const btn=document.createElement('button');
+    btn.className='pill'+(S.visibleRules.has(r.id)?'':' off');
+    btn.style.cssText=colors[r.sev]||'';
+    btn.dataset.rule=r.id;
+    btn.innerHTML=`<i class="ti ${r.icon}"></i>${r.label}`;
+    btn.addEventListener('click',()=>{
+      if(S.visibleRules.has(r.id)) S.visibleRules.delete(r.id);
+      else S.visibleRules.add(r.id);
+      btn.classList.toggle('off');
+      renderTable();
+    });
+    c.appendChild(btn);
+  });
+}
+
+// ── Rules checkboxes ───────────────────────────────────────────────────────
+function buildRules(){
+  const c=document.getElementById('rules-list');
+  const colors={danger:'#991B1B',warning:'#92400E',info:'#1E40AF'};
+  RULES.forEach(r=>{
+    const lbl=document.createElement('label');
+    lbl.className='rule-item';
+    lbl.innerHTML=`<input type="checkbox" checked data-rule="${r.id}"><span><i class="ti ${r.icon}" style="color:${colors[r.sev]};"></i>${r.label}</span>`;
+    lbl.querySelector('input').addEventListener('change',e=>{
+      if(e.target.checked) S.activeRules.add(r.id);
+      else S.activeRules.delete(r.id);
+    });
+    c.appendChild(lbl);
+  });
+}
+
+// ── Sort ───────────────────────────────────────────────────────────────────
+document.querySelectorAll('thead th[data-col]').forEach(th=>{
+  th.addEventListener('click',()=>{
+    const col=th.dataset.col;
+    document.querySelectorAll('thead th').forEach(t=>t.classList.remove('asc','desc'));
+    if(S.sortCol===col) S.sortDir*=-1;
+    else{S.sortCol=col;S.sortDir=1;}
+    th.classList.add(S.sortDir===1?'asc':'desc');
+    renderTable();
+  });
+});
+document.querySelector('thead th[data-col="date"]').classList.add('asc');
+
+// ── Export ─────────────────────────────────────────────────────────────────
+document.getElementById('btn-export').addEventListener('click',()=>{
+  if(!S.results.length) return;
+  const head=['N°','HAL ID','Type','Titre','Date','Problèmes','Traité'];
+  const body=S.results.map(r=>[
+    r.n,r.halId,r.type,
+    `"${(r.titre||'').replace(/"/g,'""')}"`,
+    r.date,
+    `"${r.flags.map(f=>f.text).join('\n').replace(/"/g,'""')}"`,
+    S.done.has(r.halId)?'Oui':'Non',
+  ].join(','));
+  const csv=[head.join(','),...body].join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'}));
+  a.download=`curation_hal_${S.collection}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+});
+
+// ── Session ────────────────────────────────────────────────────────────────
+document.getElementById('btn-save').addEventListener('click',()=>{
+  if(!S.done.size){alert('Aucune notice traitée à sauvegarder.');return;}
+  const data={validees:[...S.done],collection:S.collection,savedAt:new Date().toISOString()};
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+  a.download=`session_${S.collection}_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+});
+
+document.getElementById('inp-session').addEventListener('change',e=>{
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    try{
+      const data=JSON.parse(ev.target.result);
+      const ids=data.validees||data;
+      if(Array.isArray(ids)){
+        ids.forEach(id=>S.done.add(id));
+        updateStats();
+        if(S.results.length) renderTable();
+        alert(`${ids.length} notice(s) rechargées comme traitées.`);
+      }
+    }catch{alert('Fichier JSON invalide.');}
+  };
+  reader.readAsText(file);
+  e.target.value='';
+});
+
+// ── Only flags ─────────────────────────────────────────────────────────────
+document.getElementById('only-flags').addEventListener('change',e=>{
+  S.onlyFlags=e.target.checked;
+  renderTable();
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+const today=new Date().toISOString().slice(0,10);
+const yday=new Date(Date.now()-864e5).toISOString().slice(0,10);
+document.getElementById('inp-to').value=today;
+document.getElementById('inp-from').value=yday;
+
+document.getElementById('btn-launch').addEventListener('click',runAnalysis);
+
+buildRules();
+buildPills();
+</script>
+</body>
+</html>
