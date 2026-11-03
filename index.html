@@ -21,7 +21,7 @@
   --accent:#1D4ED8;
   --accent-bg:#EFF6FF;
   --radius:6px;
-  --sidebar:260px;
+  --sidebar:300px;
 
   --danger-bg:#FEF2F2; --danger-text:#991B1B; --danger-border:#FECACA;
   --warning-bg:#FFFBEB; --warning-text:#92400E; --warning-border:#FDE68A;
@@ -32,7 +32,7 @@
 body{font-family:'Inter',-apple-system,sans-serif;font-size:13px;color:var(--text);background:var(--bg);display:flex;height:100vh;overflow:hidden;}
 
 /* ── Sidebar ── */
-#sidebar{width:var(--sidebar);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow-y:auto;}
+#sidebar{width:var(--sidebar);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow-y:auto;overflow-x:hidden;}
 
 .sb-logo{padding:18px 16px 14px;border-bottom:1px solid var(--border);}
 .sb-logo h1{font-size:14px;font-weight:600;display:flex;align-items:center;gap:6px;margin-bottom:2px;}
@@ -45,8 +45,8 @@ input[type=text],input[type=date]{width:100%;padding:7px 10px;border:1px solid v
 input[type=text]:focus,input[type=date]:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(29,78,216,.1);}
 
 .date-row{display:flex;gap:8px;}
-.date-row > div{flex:1;}
-.date-row label{font-size:10px;color:var(--text-2);display:block;margin-bottom:3px;}
+.date-row > div{flex:1;min-width:0;}
+.date-row label{font-size:10px;color:var(--text-2);display:block;margin-bottom:3px;}input[type=date]{padding:7px 6px;font-size:12px;}
 
 .rules-list{display:flex;flex-direction:column;gap:5px;}
 .rule-item{display:flex;align-items:center;gap:8px;cursor:pointer;}
@@ -88,6 +88,13 @@ input[type=text]:focus,input[type=date]:focus{border-color:var(--accent);box-sha
 #progress{height:2px;background:var(--accent);width:0%;transition:width .3s ease;flex-shrink:0;}
 #status{padding:5px 20px;font-size:11px;color:var(--text-2);background:var(--bg);border-bottom:1px solid var(--border);min-height:24px;flex-shrink:0;}
 
+#tabs{display:flex;gap:2px;padding:0 20px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;}
+.tab{padding:9px 14px;border:none;background:none;font-family:inherit;font-size:12px;font-weight:500;color:var(--text-2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;align-items:center;gap:6px;}
+.tab:hover{color:var(--text);}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-count{font-size:10px;background:var(--bg);border:1px solid var(--border);padding:1px 6px;border-radius:10px;color:var(--text-2);}
+.tab.active .tab-count{background:var(--accent-bg);border-color:var(--info-border);color:var(--accent);}
+
 /* ── Table ── */
 #table-wrap{flex:1;overflow-y:auto;}
 
@@ -105,7 +112,6 @@ thead th.no-sort{cursor:default;}
 .main-row{cursor:pointer;border-bottom:1px solid var(--border);transition:background .1s;}
 .main-row:hover{background:#F9FAFB;}
 .main-row.open{background:#F9FAFB;border-bottom:none;}
-.main-row.done{opacity:.35;}
 
 .main-row td{padding:8px 10px;vertical-align:middle;}
 td.c-chev{width:28px;padding:8px 4px 8px 10px;}
@@ -153,6 +159,8 @@ td.c-act{text-align:right;padding-right:14px;white-space:nowrap;}
 .btn-action:hover{background:var(--bg);}
 .btn-action.primary{background:var(--accent);color:white;border-color:var(--accent);}
 .btn-action.primary:hover{background:#1e40af;}
+
+.author-warn{color:#B45309;font-style:italic;font-weight:500;border-bottom:1px dotted #B45309;}
 
 /* ── Footer ── */
 #footer{background:var(--surface);border-top:1px solid var(--border);padding:9px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
@@ -220,7 +228,10 @@ td.c-act{text-align:right;padding-right:14px;white-space:nowrap;}
 
   <div id="progress"></div>
   <div id="status"></div>
-
+  <div id="tabs">
+    <button class="tab active" data-view="todo"><i class="ti ti-list-check"></i>À traiter <span class="tab-count" id="cnt-todo">0</span></button>
+    <button class="tab" data-view="done"><i class="ti ti-circle-check"></i>Traitées <span class="tab-count" id="cnt-done">0</span></button>
+  </div>
   <div id="table-wrap">
     <div id="empty">
       <i class="ti ti-search"></i>
@@ -285,6 +296,7 @@ const S = {
   activeRules:new Set(RULES.map(r=>r.id)),
   visibleRules:new Set(RULES.map(r=>r.id)),
   onlyFlags:true,
+  view:'todo',
   openRow:null,
   sortCol:'date',
   sortDir:1,
@@ -317,6 +329,37 @@ function detectLang(text){
 }
 
 // ── Flagging ───────────────────────────────────────────────────────────────
+function nameForAuthId(doc,id){
+  for(const [k,v] of Object.entries(doc)){
+    if(!/^auth.*_fs$/.test(k)) continue;
+    for(const e of arr(v)){
+      if(typeof e!=='string') continue;
+      const parts=e.split('_FacetSep_');
+      if(!parts.includes(id)) continue;
+      const cand=parts.find(p=>p!==id && /[A-Za-zÀ-ÿ]/.test(p) && !p.includes('_JoinSep_'));
+      if(cand) return cand;
+    }
+  }
+  return null;
+}
+
+function getUnaffiliated(doc){
+  const ids=arr(doc.authIdFormPerson_s);
+  const withAffil=new Set();
+  arr(doc.structHasAlphaAuthId_fs).forEach(e=>{
+    const m=e.match(/_JoinSep_([^_]+)_FacetSep_/);
+    if(m) withAffil.add(m[1]);
+  });
+  const fullNames=arr(doc.authFullName_s);
+  const list=[];
+  ids.forEach((id,i)=>{
+    if(withAffil.has(id)) return;
+    const name=nameForAuthId(doc,id)||(fullNames.length===ids.length?fullNames[i]:null);
+    list.push({id,name});
+  });
+  return {total:ids.length,list};
+}
+
 function flagNotice(doc){
   const flags=[];
   const type=doc.docType_s;
@@ -353,16 +396,8 @@ function flagNotice(doc){
     add('revue','danger','ti-alert-triangle','Revue invalide (INCOMING)');
   }
 
-  if(S.activeRules.has('affiliation')){
-    const all=arr(doc.authIdFormPerson_s);
-    const withAffil=new Set();
-    arr(doc.structHasAlphaAuthId_fs).forEach(e=>{
-      const m=e.match(/_JoinSep_([^_]+)_FacetSep_/);
-      if(m) withAffil.add(m[1]);
-    });
-    const without=all.filter(a=>!withAffil.has(a)).length;
-    if(without>0) add('affiliation','warning','ti-users',`${without} auteur(s) sans affiliation sur ${all.length}`);
-  }
+  const u=getUnaffiliated(doc);
+  if(u.list.length>0) add('affiliation','warning','ti-users',`${u.list.length} auteur(s) sans affiliation sur ${u.total}`);
 
   if(S.activeRules.has('langue')){
     const declared=first(doc.language_s);
@@ -497,6 +532,7 @@ async function runAnalysis(){
         date:(doc.releasedDate_tdate||'').slice(0,10),
         flags,
         doublons,
+        unaff:getUnaffiliated(doc).list,
         doc,
       });
 
@@ -537,14 +573,19 @@ function renderTable(){
     return S.sortDir*(va<vb?-1:va>vb?1:0);
   });
 
-  // Filter done
-  const active=rows.filter(r=>!S.done.has(r.halId));
-  const display=S.onlyFlags?active.filter(r=>r.flags.length>0):active;
-  const doneRows=S.onlyFlags?[]:[...S.results].filter(r=>S.done.has(r.halId));
+    const display=S.view==='done'
+    ?rows.filter(r=>S.done.has(r.halId))
+    :rows.filter(r=>!S.done.has(r.halId)&&(!S.onlyFlags||r.flags.length>0));
 
   tbody.innerHTML='';
 
-  [...display,...doneRows].forEach(row=>{
+  if(!display.length){
+    tbody.innerHTML=`<tr><td colspan="7" style="padding:40px;text-align:center;color:var(--text-2);">${S.view==='done'?'Aucune notice traitée pour le moment.':'Aucune notice à afficher.'}</td></tr>`;
+    updateStats();
+    return;
+  }
+
+  display.forEach(row=>{
     const isDone=S.done.has(row.halId);
     const isOpen=S.openRow===row.halId;
     const visF=row.flags.filter(f=>S.visibleRules.has(f.rule));
@@ -554,9 +595,7 @@ function renderTable(){
     tr.className='main-row'+(isOpen?' open':'')+(isDone?' done':'');
     tr.dataset.id=row.halId;
 
-    const flagsCell=isDone
-      ?'<span class="badge success"><i class="ti ti-check"></i>Traité</span>'
-      :(visF.length?visF.map(f=>badgeHtml(f)).join(''):'<span style="font-size:11px;color:var(--text-3);">—</span>');
+    const flagsCell=visF.length?visF.map(f=>badgeHtml(f)).join(''):'<span style="font-size:11px;color:var(--text-3);">—</span>';
 
     const doneBtn=isDone
       ?`<button class="btn-done undone-btn" data-id="${esc(row.halId)}" style="color:var(--text-3);"><i class="ti ti-rotate-clockwise"></i>Remettre</button>`
@@ -596,7 +635,16 @@ function renderTable(){
 
     const doc=row.doc;
     const doi=first(doc.doiId_s);
-    const authors=arr(doc.authFullName_s).join(', ')||arr(doc.authLastName_s).join(', ')||'—';
+    const authList=arr(doc.authFullName_s).length?arr(doc.authFullName_s):arr(doc.authLastName_s);
+    const hl=S.visibleRules.has('affiliation')&&row.flags.some(f=>f.rule==='affiliation');
+    const unaffNames=hl?row.unaff.map(u=>u.name).filter(Boolean).map(n=>n.toLowerCase()):[];
+    const unaffUnknown=hl?row.unaff.filter(u=>!u.name).length:0;
+    const authors=authList.length
+      ?authList.map(a=>unaffNames.includes(a.toLowerCase())
+          ?`<span class="author-warn" title="Sans affiliation">${esc(a)}</span>`
+          :esc(a)).join(', ')
+      :'—';
+    const authorsHtml=authors+(unaffUnknown?` <span class="author-warn">(+${unaffUnknown} non identifié(s))</span>`:'');
     const journal=first(doc.journalTitle_s)||first(doc.publicationTitle_s)||'—';
     const lang=first(doc.language_s)||'—';
 
@@ -606,7 +654,7 @@ function renderTable(){
         ${doublonHtml}
         <div class="detail-meta">
           <div class="meta-field"><label>Titre</label><span>${esc(row.titre)||'—'}</span></div>
-          <div class="meta-field"><label>Auteurs</label><span>${esc(authors)}</span></div>
+          <div class="meta-field"><label>Auteurs</label><span>${esc(authorsHtml)}</span></div>
           <div class="meta-field"><label>DOI</label><span>${doi?`<a href="https://doi.org/${esc(doi)}" target="_blank">${esc(doi)}</a>`:'—'}</span></div>
           <div class="meta-field"><label>Revue / éditeur</label><span>${esc(journal)}</span></div>
           <div class="meta-field"><label>Langue déclarée</label><span>${esc(lang)}</span></div>
@@ -615,7 +663,7 @@ function renderTable(){
         <div class="detail-actions">
           <a class="btn-action" href="https://hal.science/${esc(row.halId)}" target="_blank"><i class="ti ti-external-link"></i>Voir sur HAL</a>
           ${isDone
-            ?'<span class="badge success" style="font-size:12px;padding:5px 12px;"><i class="ti ti-check"></i>Traité</span>'
+            ?`<button class="btn-action undone-btn" data-id="${esc(row.halId)}"><i class="ti ti-rotate-clockwise"></i>Remettre à traiter</button>`
             :`<button class="btn-action primary done-btn" data-id="${esc(row.halId)}"><i class="ti ti-check"></i>Marquer traité</button>`}
         </div>
       </div>
@@ -646,11 +694,12 @@ function updateStats(){
   const flags=S.results.filter(r=>r.flags.length>0).length;
   document.getElementById('st-total').textContent=tot||'—';
   document.getElementById('st-flags').textContent=flags||'—';
-  document.getElementById('st-done').textContent=S.done.size;
-  const disp=S.onlyFlags
-    ?S.results.filter(r=>r.flags.length>0&&!S.done.has(r.halId)).length
-    :S.results.filter(r=>!S.done.has(r.halId)).length;
-  document.getElementById('footer-count').textContent=tot?`${disp} notice(s) affichée(s) · ${S.done.size} traitée(s)`:'';
+  const nDone=S.results.filter(r=>S.done.has(r.halId)).length;
+  const nTodo=S.results.filter(r=>!S.done.has(r.halId)&&(!S.onlyFlags||r.flags.length>0)).length;
+  document.getElementById('st-done').textContent=nDone;
+  document.getElementById('cnt-todo').textContent=nTodo;
+  document.getElementById('cnt-done').textContent=nDone;
+  document.getElementById('footer-count').textContent=tot?`${S.view==='done'?nDone:nTodo} notice(s) affichée(s)`:'';
   document.getElementById('btn-export').disabled=tot===0;
 }
 
@@ -759,6 +808,12 @@ document.getElementById('inp-session').addEventListener('change',e=>{
 });
 
 // ── Only flags ─────────────────────────────────────────────────────────────
+document.querySelectorAll('#tabs .tab').forEach(b=>b.addEventListener('click',()=>{
+  S.view=b.dataset.view;
+  S.openRow=null;
+  document.querySelectorAll('#tabs .tab').forEach(t=>t.classList.toggle('active',t===b));
+  renderTable();
+}));
 document.getElementById('only-flags').addEventListener('change',e=>{
   S.onlyFlags=e.target.checked;
   renderTable();
