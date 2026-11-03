@@ -138,7 +138,7 @@ td.c-act{text-align:right;padding-right:14px;white-space:nowrap;}
 /* ── Detail panel ── */
 .detail-row td{padding:0;}
 .detail-panel{overflow:hidden;max-height:0;transition:max-height .25s ease;background:#FAFBFC;border-bottom:1px solid var(--border);}
-.detail-panel.open{max-height:500px;}
+.detail-panel.open{max-height:900px;}
 .detail-inner{padding:12px 14px 14px 38px;}
 
 .detail-flags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;}
@@ -149,6 +149,9 @@ td.c-act{text-align:right;padding-right:14px;white-space:nowrap;}
 .doublon-item{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0;border-top:1px solid var(--warning-border);margin-top:3px;}
 .doublon-item a{color:var(--accent);text-decoration:none;font-size:11px;display:flex;align-items:center;gap:3px;}
 .doublon-item a:hover{text-decoration:underline;}
+.doublon-list{max-height:260px;overflow-y:auto;}
+.dup-toggle{margin-top:6px;padding:4px 10px;border:1px solid var(--warning-border);border-radius:var(--radius);background:var(--surface);color:var(--warning-text);font-family:inherit;font-size:11px;cursor:pointer;}
+.dup-toggle:hover{background:var(--warning-bg);}
 
 .detail-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:12px;font-size:12px;}
 .meta-field label{font-size:10px;color:var(--text-2);display:block;margin-bottom:2px;font-weight:500;}
@@ -298,6 +301,7 @@ const S = {
   visibleRules:new Set(RULES.map(r=>r.id)),
   onlyFlags:true,
   view:'todo',
+  dupExpanded:new Set(),
   openRow:null,
   sortCol:'date',
   sortDir:1,
@@ -624,15 +628,22 @@ function renderTable(){
 
     const allFlags=row.flags.map(f=>badgeHtml(f,true)).join('');
 
+    const DUP_MAX=5;
+    const dupOpen=S.dupExpanded.has(row.halId);
+    const dupShown=dupOpen?row.doublons:row.doublons.slice(0,DUP_MAX);
+    const dupHidden=row.doublons.length-DUP_MAX;
     const doublonHtml=row.doublons.length?`
       <div class="doublon-box">
         <div class="doublon-title"><i class="ti ti-copy"></i>${row.doublons.length} doublon(s) potentiel(s)</div>
-        ${row.doublons.map(d=>`
+        <div class="doublon-list">
+        ${dupShown.map(d=>`
           <div class="doublon-item">
             <div><b>${esc(d.halId)}</b><br><span style="color:var(--text-2);font-size:11px;">${esc(d.title.slice(0,80))}</span></div>
             <a href="https://hal.science/${esc(d.halId)}" target="_blank">Voir <i class="ti ti-external-link"></i></a>
           </div>`).join('')}
-      </div>`:''  ;
+        </div>
+        ${dupHidden>0?`<button class="dup-toggle" data-id="${esc(row.halId)}">${dupOpen?'Réduire la liste':`Afficher les ${dupHidden} autres`}</button>`:''}
+      </div>`:'';
 
     const doc=row.doc;
     const doi=first(doc.doiId_s);
@@ -685,6 +696,13 @@ function renderTable(){
     S.done.delete(btn.dataset.id);
     renderTable();
     updateStats();
+  }));
+
+  tbody.querySelectorAll('.dup-toggle').forEach(btn=>btn.addEventListener('click',e=>{
+    e.stopPropagation();
+    const id=btn.dataset.id;
+    if(S.dupExpanded.has(id)) S.dupExpanded.delete(id); else S.dupExpanded.add(id);
+    renderTable();
   }));
 
   updateStats();
