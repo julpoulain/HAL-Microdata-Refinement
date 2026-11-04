@@ -206,11 +206,12 @@ td.c-act{text-align:right;padding-right:14px;white-space:nowrap;}
   <div class="sb-section">
     <label>Session</label>
     <div class="session-btns">
-      <button class="btn-sm" id="btn-save"><i class="ti ti-download"></i>Sauvegarder les notices traitées</button>
-      <label class="btn-sm">
-        <i class="ti ti-upload"></i>Reprendre une session
-        <input type="file" id="inp-session" accept=".json" style="display:none;">
-      </label>
+      <button class="btn-sm" id="btn-save"><i class="ti ti-download"></i>Exporter la session (fichier)</button>
+        <label class="btn-sm">
+          <i class="ti ti-upload"></i>Importer une session
+          <input type="file" id="inp-session" accept=".json" style="display:none;">
+        </label>
+      <button class="btn-sm" id="btn-clear"><i class="ti ti-trash"></i>Effacer la session locale</button>
     </div>
   </div>
 </aside>
@@ -721,6 +722,7 @@ function updateStats(){
   document.getElementById('cnt-done').textContent=nDone;
   document.getElementById('footer-count').textContent=tot?`${S.view==='done'?nDone:nTodo} notice(s) affichée(s)`:'';
   document.getElementById('btn-export').disabled=tot===0;
+  persist();
 }
 
 function setStatus(msg){document.getElementById('status').textContent=msg;}
@@ -799,12 +801,89 @@ document.getElementById('btn-export').addEventListener('click',()=>{
 });
 
 // ── Session ────────────────────────────────────────────────────────────────
+const LS_KEY='hal-curation:session:v2';
+let persistTimer=null;
+let skipSave=false;
+
+function buildSession(){
+  return {
+    version:2,
+    collection:S.collection,
+    from:document.getElementById('inp-from').value,
+    to:document.getElementById('inp-to').value,
+    savedAt:new Date().toISOString(),
+    done:[...S.done],
+    results:S.results.map(r=>({
+      n:r.n,halId:r.halId,titre:r.titre,type:r.type,date:r.date,
+      flags:r.flags,doublons:r.doublons,unaff:r.unaff,
+      doc:{
+        doiId_s:r.doc.doiId_s,
+        authFullName_s:r.doc.authFullName_s,
+        authLastName_s:r.doc.authLastName_s,
+        journalTitle_s:r.doc.journalTitle_s,
+        publicationTitle_s:r.doc.publicationTitle_s,
+        language_s:r.doc.language_s,
+      },
+    })),
+  };
+}
+
+function applySession(data){
+  S.results=Array.isArray(data.results)?data.results:[];
+  S.done=new Set(data.done||[]);
+  S.collection=data.collection||'';
+  S.openRow=null;
+  S.view='todo';
+  document.querySelectorAll('#tabs .tab').forEach(t=>t.classList.toggle('active',t.dataset.view==='todo'));
+  if(data.collection) document.getElementById('inp-coll').value=data.collection;
+  if(data.from) document.getElementById('inp-from').value=data.from;
+  if(data.to) document.getElementById('inp-to').value=data.to;
+  showTable(S.results.length>0);
+  renderTable();
+}
+
+// ── Sauvegarde automatique dans le navigateur ──
+function saveNow(){
+  if(skipSave||S.running||(!S.results.length&&!S.done.size)) return;
+  try{
+    localStorage.setItem(LS_KEY,JSON.stringify(buildSession()));
+  }catch(e){
+    setStatus('⚠️ Sauvegarde automatique impossible (espace navigateur insuffisant) — pense à exporter la session en fichier.');
+  }
+}
+function persist(){
+  clearTimeout(persistTimer);
+  persistTimer=setTimeout(saveNow,500);
+}
+window.addEventListener('pagehide',saveNow);
+
+function restoreFromBrowser(){
+  try{
+    const raw=localStorage.getItem(LS_KEY);
+    if(!raw) return;
+    const data=JSON.parse(raw);
+    if(data.version!==2||!Array.isArray(data.results)||!data.results.length) return;
+    applySession(data);
+    const d=new Date(data.savedAt);
+    setStatus(`Session précédente restaurée (${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}) : ${data.results.length} notices, dont ${(data.done||[]).length} traitée(s).`);
+    setTimeout(()=>setStatus(''),6000);
+  }catch{}
+}
+
+document.getElementById('btn-clear').addEventListener('click',()=>{
+  if(!confirm('Effacer la session enregistrée dans ce navigateur et repartir de zéro ?')) return;
+  skipSave=true;
+  clearTimeout(persistTimer);
+  try{localStorage.removeItem(LS_KEY);}catch{}
+  location.reload();
+});
+
+// ── Export / import de fichier ──
 document.getElementById('btn-save').addEventListener('click',()=>{
-  if(!S.done.size){alert('Aucune notice traitée à sauvegarder.');return;}
-  const data={validees:[...S.done],collection:S.collection,savedAt:new Date().toISOString()};
+  if(!S.results.length&&!S.done.size){alert('Rien à sauvegarder pour le moment.');return;}
   const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
-  a.download=`session_${S.collection}_${new Date().toISOString().slice(0,10)}.json`;
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(buildSession())],{type:'application/json'}));
+  a.download=`session_${S.collection||'hal'}_${new Date().toISOString().slice(0,10)}.json`;
   a.click();
 });
 
@@ -814,13 +893,20 @@ document.getElementById('inp-session').addEventListener('change',e=>{
   reader.onload=ev=>{
     try{
       const data=JSON.parse(ev.target.result);
-      const ids=data.validees||data;
-      if(Array.isArray(ids)){
+
+      // Ancien format : simple liste d'identifiants traités
+      if(Array.isArray(data)||data.validees){
+        const ids=Array.isArray(data)?data:data.validees;
         ids.forEach(id=>S.done.add(id));
         updateStats();
         if(S.results.length) renderTable();
-        alert(`${ids.length} notice(s) rechargées comme traitées.`);
+        alert(`${ids.length} notice(s) marquées comme traitées. Lance l'analyse sur la même période pour les retrouver.`);
+        return;
       }
+
+      applySession(data);
+      setStatus(`Session importée : ${S.results.length} notices, dont ${S.done.size} traitée(s).`);
+      setTimeout(()=>setStatus(''),3000);
     }catch{alert('Fichier JSON invalide.');}
   };
   reader.readAsText(file);
@@ -849,6 +935,7 @@ document.getElementById('btn-launch').addEventListener('click',runAnalysis);
 
 buildRules();
 buildPills();
+restoreFromBrowser();
 </script>
 </body>
 </html>
