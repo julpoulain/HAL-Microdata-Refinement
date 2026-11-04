@@ -139,7 +139,7 @@ td.c-act{text-align:right;padding-right:14px;white-space:nowrap;}
 /* ── Detail panel ── */
 .detail-row td{padding:0;}
 .detail-panel{overflow:hidden;max-height:0;transition:max-height .25s ease;background:#FAFBFC;border-bottom:1px solid var(--border);}
-.detail-panel.open{max-height:900px;}
+.detail-panel.open{max-height:1400px;}
 .detail-inner{padding:12px 14px 14px 38px;}
 
 .detail-flags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;}
@@ -153,6 +153,19 @@ td.c-act{text-align:right;padding-right:14px;white-space:nowrap;}
 .doublon-list{max-height:260px;overflow-y:auto;}
 .dup-toggle{margin-top:6px;padding:4px 10px;border:1px solid var(--warning-border);border-radius:var(--radius);background:var(--surface);color:var(--warning-text);font-family:inherit;font-size:11px;cursor:pointer;}
 .dup-toggle:hover{background:var(--warning-bg);}
+.btn-crossref{margin-left:6px;padding:2px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);font-family:inherit;font-size:11px;cursor:pointer;color:var(--accent);display:inline-flex;align-items:center;gap:4px;}
+.btn-crossref:hover{background:var(--accent-bg);}
+.btn-crossref:disabled{opacity:.5;cursor:wait;}
+.cr-box{background:var(--surface);border:1px solid var(--info-border);border-radius:var(--radius);padding:9px 12px;margin-bottom:12px;}
+.cr-title{font-size:11px;font-weight:500;color:var(--info-text);margin-bottom:4px;display:flex;align-items:center;gap:5px;}
+.cr-item{padding:7px 0;border-top:1px solid var(--border);font-size:12px;}
+.cr-score{font-weight:600;font-size:11px;margin-bottom:2px;}
+.cr-meta{color:var(--text-2);font-size:11px;}
+.cr-links{margin-top:4px;display:flex;gap:14px;font-size:11px;}
+.cr-links a{color:var(--accent);text-decoration:none;}
+.cr-links a:hover{text-decoration:underline;}
+.cr-copy{background:none;border:none;padding:0;font-family:inherit;font-size:11px;color:var(--accent);cursor:pointer;display:inline-flex;align-items:center;gap:3px;}
+.cr-note{font-size:10px;color:var(--text-3);margin-top:6px;}
 
 .detail-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:12px;font-size:12px;}
 .meta-field label{font-size:10px;color:var(--text-2);display:block;margin-bottom:2px;font-weight:500;}
@@ -304,6 +317,7 @@ const S = {
   onlyFlags:true,
   view:'todo',
   dupExpanded:new Set(),
+  crossref:{},
   openRow:null,
   sortCol:'date',
   sortDir:1,
@@ -563,6 +577,97 @@ async function runAnalysis(){
   btn.innerHTML='<i class="ti ti-player-play"></i>Lancer l\'analyse';
 }
 
+// ── Crossref ───────────────────────────────────────────────────────────────
+const CROSSREF_API='https://api.crossref.org/works';
+const CROSSREF_MAILTO=''; // optionnel : ton adresse mail (recommandé par Crossref)
+
+function normStr(str){
+  return (str||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+}
+
+function titleSimilarity(a,b){
+  const ta=normStr(a).split(' ').filter(w=>w.length>2);
+  const tb=normStr(b).split(' ').filter(w=>w.length>2);
+  if(!ta.length||!tb.length) return 0;
+  const setB=new Set(tb);
+  const common=ta.filter(w=>setB.has(w)).length;
+  return (2*common)/(ta.length+tb.length);
+}
+
+function authorOverlap(halAuthors,crAuthors){
+  if(!halAuthors.length||!crAuthors.length) return 0;
+  const crFamilies=crAuthors.map(a=>normStr(a.family||''));
+  const halLast=halAuthors.map(a=>{const p=normStr(a).split(' ');return p[p.length-1];});
+  const matches=halLast.filter(n=>n&&crFamilies.some(f=>f===n||f.split(' ').includes(n))).length;
+  return matches/halLast.length;
+}
+
+async function queryCrossref(title){
+  let url=`${CROSSREF_API}?query.bibliographic=${encodeURIComponent(title)}&rows=5`;
+  if(CROSSREF_MAILTO) url+=`&mailto=${encodeURIComponent(CROSSREF_MAILTO)}`;
+  const resp=await fetch(url);
+  if(!resp.ok) throw new Error(`Requête Crossref échouée (${resp.status})`);
+  const data=await resp.json();
+  return (data.message&&data.message.items)||[];
+}
+
+function scoreCandidates(row,items){
+  const halAuthors=arr(row.doc.authFullName_s);
+  return items.map(item=>{
+    const crTitle=(item.title&&item.title[0])||'';
+    const score=0.7*titleSimilarity(row.titre,crTitle)+0.3*authorOverlap(halAuthors,item.author||[]);
+    const dp=item.issued&&item.issued['date-parts']&&item.issued['date-parts'][0];
+    return {
+      doi:item.DOI,
+      title:crTitle,
+      authors:(item.author||[]).map(a=>`${a.given||''} ${a.family||''}`.trim()).join(', '),
+      container:(item['container-title']&&item['container-title'][0])||'',
+      year:(dp&&dp[0])||'',
+      score,
+    };
+  }).sort((a,b)=>b.score-a.score);
+}
+
+async function runCrossref(halId){
+  const row=S.results.find(r=>r.halId===halId);
+  if(!row) return;
+  if(!row.titre){S.crossref[halId]={status:'error',error:'Titre absent de la notice.'};renderTable();return;}
+  S.crossref[halId]={status:'loading'};
+  renderTable();
+  try{
+    const items=await queryCrossref(row.titre);
+    S.crossref[halId]={status:'done',results:scoreCandidates(row,items)};
+  }catch(e){
+    S.crossref[halId]={status:'error',error:e.message||'Erreur inconnue'};
+  }
+  renderTable();
+}
+
+function crossrefHtml(row){
+  const cr=S.crossref[row.halId];
+  if(!cr) return '';
+  if(cr.status==='loading') return '<div class="cr-box"><div class="cr-title"><i class="ti ti-refresh spinning"></i>Recherche sur Crossref…</div></div>';
+  if(cr.status==='error') return `<div class="cr-box"><div class="cr-title" style="color:var(--danger-text);"><i class="ti ti-alert-triangle"></i>${esc(cr.error)}</div></div>`;
+  if(!cr.results.length) return '<div class="cr-box"><div class="cr-title"><i class="ti ti-world-search"></i>Aucun résultat Crossref pour ce titre.</div></div>';
+  const items=cr.results.slice(0,3).map(r=>{
+    const pct=Math.round(r.score*100);
+    const color=pct>=70?'var(--success-text)':pct>=40?'var(--warning-text)':'var(--danger-text)';
+    return `<div class="cr-item">
+      <div class="cr-score" style="color:${color};">Confiance : ${pct}%</div>
+      <div>${esc(r.title)||'—'}</div>
+      <div class="cr-meta">${esc(r.authors)}</div>
+      <div class="cr-meta"><i>${esc(r.container)}</i>${r.year?` · ${esc(String(r.year))}`:''}</div>
+      <div class="cr-links">
+        <a href="https://doi.org/${esc(r.doi)}" target="_blank">doi.org/${esc(r.doi)}</a>
+        <button class="cr-copy" data-doi="${esc(r.doi)}"><i class="ti ti-copy"></i>copier</button>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="cr-box"><div class="cr-title"><i class="ti ti-world-search"></i>Candidats Crossref</div>${items}<div class="cr-note">Vérifie manuellement avant de compléter la notice : le score est indicatif.</div></div>`;
+}
+
 // ── Render ─────────────────────────────────────────────────────────────────
 function badgeHtml(f,lg=false){
   const s=lg?'font-size:12px;padding:4px 10px;':'';
@@ -669,11 +774,12 @@ function renderTable(){
         <div class="detail-meta">
           <div class="meta-field"><label>Titre</label><span>${esc(row.titre)||'—'}</span></div>
           <div class="meta-field"><label>Auteurs</label><span>${authorsHtml}</span></div>
-          <div class="meta-field"><label>DOI</label><span>${doi?`<a href="https://doi.org/${esc(doi)}" target="_blank">${esc(doi)}</a>`:'—'}</span></div>
+          <div class="meta-field"><label>DOI</label><span>${doi?`<a href="https://doi.org/${esc(doi)}" target="_blank">${esc(doi)}</a>`:`— <button class="btn-crossref" data-id="${esc(row.halId)}" ${(S.crossref[row.halId]||{}).status==='loading'?'disabled':''}><i class="ti ti-world-search"></i>Chercher sur Crossref</button>`}</span></div>
           <div class="meta-field"><label>Revue</label><span>${esc(journal)}</span></div>
           <div class="meta-field"><label>Langue déclarée</label><span>${esc(lang)}</span></div>
           <div class="meta-field"><label>Date de dépôt</label><span>${fmtDate(row.date)}</span></div>
         </div>
+        ${crossrefHtml(row)}
         <div class="detail-actions">
           <a class="btn-action" href="https://hal.science/${esc(row.halId)}" target="_blank"><i class="ti ti-external-link"></i>Voir sur HAL</a>
           ${isDone
@@ -698,6 +804,16 @@ function renderTable(){
     S.done.delete(btn.dataset.id);
     renderTable();
     updateStats();
+  }));
+  
+  tbody.querySelectorAll('.btn-crossref').forEach(btn=>btn.addEventListener('click',e=>{
+    e.stopPropagation();
+    runCrossref(btn.dataset.id);
+  }));
+  tbody.querySelectorAll('.cr-copy').forEach(btn=>btn.addEventListener('click',e=>{
+    e.stopPropagation();
+    if(navigator.clipboard) navigator.clipboard.writeText(btn.dataset.doi);
+    btn.innerHTML='<i class="ti ti-check"></i>copié';
   }));
 
   tbody.querySelectorAll('.dup-toggle').forEach(btn=>btn.addEventListener('click',e=>{
