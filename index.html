@@ -167,6 +167,27 @@ td.c-act{text-align:right;padding-right:14px;white-space:nowrap;}
 .cr-copy{background:none;border:none;padding:0;font-family:inherit;font-size:11px;color:var(--accent);cursor:pointer;display:inline-flex;align-items:center;gap:3px;}
 .cr-note{font-size:10px;color:var(--text-3);margin-top:6px;}
 
+/* ── Corrections ── */
+#topbar{position:relative;}
+.stat-click{cursor:pointer;}
+.stat-click:hover .stat-val{color:var(--accent);}
+#log-pop{display:none;position:absolute;top:calc(100% + 4px);left:20px;z-index:60;width:320px;background:var(--surface);border:1px solid var(--border-strong);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);padding:12px 14px;font-size:12px;}
+#log-pop.open{display:block;}
+.log-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);}
+.log-total{display:flex;justify-content:space-between;font-weight:600;padding:6px 0 8px;}
+.log-actions{display:flex;flex-direction:column;gap:6px;margin-top:4px;}
+.fix-wrap{display:inline-flex;align-items:center;gap:4px;margin-right:6px;}
+.fix-toggle{border:none;cursor:pointer;}
+.fix-toggle:hover{filter:brightness(.96);}
+.stepper{display:inline-flex;align-items:center;gap:2px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1px 3px;font-size:11px;}
+.stepper button{border:none;background:none;cursor:pointer;font-size:13px;line-height:1;padding:0 4px;color:var(--text-2);}
+.stepper button:hover{color:var(--accent);}
+.fix-manual{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:10px;font-size:11px;}
+.fix-manual-lbl{color:var(--text-2);font-weight:500;}
+.fix-chip{display:inline-flex;align-items:center;gap:4px;background:var(--success-bg);color:var(--success-text);border:1px solid var(--success-border);border-radius:5px;padding:2px 4px 2px 8px;}
+.fix-chip button{border:none;background:none;cursor:pointer;color:inherit;font-size:11px;padding:0 3px;}
+.fix-add{font-family:inherit;font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text-2);cursor:pointer;}
+
 .detail-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:12px;font-size:12px;}
 .meta-field label{font-size:10px;color:var(--text-2);display:block;margin-bottom:2px;font-weight:500;}
 .meta-field a{color:var(--accent);text-decoration:none;}
@@ -235,7 +256,10 @@ td.c-act{text-align:right;padding-right:14px;white-space:nowrap;}
       <div><div class="stat-val" id="st-total">—</div><div class="stat-lbl">notices</div></div>
       <div><div class="stat-val" id="st-flags">—</div><div class="stat-lbl">avec problème</div></div>
       <div><div class="stat-val" id="st-done">0</div><div class="stat-lbl">traitées</div></div>
+      <div class="stat-click" id="st-corr-wrap" title="Voir le détail des corrections">
+      <div class="stat-val" id="st-corr">0</div><div class="stat-lbl">corrections ▾</div></div>
     </div>
+    <div id="log-pop"></div>
     <div class="topbar-right">
       <label class="only-flags-label">
         <input type="checkbox" id="only-flags" checked>
@@ -318,6 +342,7 @@ const S = {
   view:'todo',
   dupExpanded:new Set(),
   crossref:{},
+  log:[],
   openRow:null,
   sortCol:'date',
   sortDir:1,
@@ -668,6 +693,106 @@ function crossrefHtml(row){
   return `<div class="cr-box"><div class="cr-title"><i class="ti ti-world-search"></i>Candidats Crossref</div>${items}<div class="cr-note">Vérifie manuellement avant de compléter la notice : le score est indicatif.</div></div>`;
 }
 
+// ── Journal des corrections ────────────────────────────────────────────────
+const FIX_LABELS={
+  doi:'DOI ajouté',
+  resume:'Résumé ajouté',
+  editeur:'Éditeur scientifique ajouté',
+  revue:'Revue corrigée',
+  affiliation:"Affiliation d'auteur corrigée",
+  doublon:'Doublon fusionné',
+  langue:'Langue corrigée',
+  // types supplémentaires pour les corrections hors flags (modifie cette liste à ta convenance)
+  titre:'Titre corrigé',
+  idhal:'Identifiant auteur ajouté',
+  fichier:'Fichier ou lien ajouté',
+  autre:'Autre correction',
+};
+const COUNTABLE=new Set(['affiliation','doublon']); // règles où la quantité compte (ajustable avec − / +)
+
+const findFix=(halId,rule)=>S.log.find(e=>e.halId===halId&&e.rule===rule);
+const totalFixes=()=>S.log.reduce((n,e)=>n+e.qty,0);
+
+function setFix(halId,rule,qty){
+  const e=findFix(halId,rule);
+  if(qty<=0){ if(e) S.log=S.log.filter(x=>x!==e); }
+  else if(e) e.qty=qty;
+  else S.log.push({halId,rule,qty,ts:new Date().toISOString()});
+}
+
+function defaultFixQty(row,rule){
+  return rule==='affiliation'?Math.max(1,(row.unaff||[]).length):1;
+}
+
+function fixBadge(row,f){
+  if(f.sev==='info') return badgeHtml(f,true);
+  const e=findFix(row.halId,f.rule);
+  const id=esc(row.halId);
+  const stepper=(e&&COUNTABLE.has(f.rule))
+    ?`<span class="stepper"><button class="fix-step" data-id="${id}" data-rule="${f.rule}" data-delta="-1" title="Moins">−</button><b>${e.qty}</b><button class="fix-step" data-id="${id}" data-rule="${f.rule}" data-delta="1" title="Plus">+</button></span>`
+    :'';
+  return `<span class="fix-wrap"><button class="badge ${e?'success':f.sev} fix-toggle" data-id="${id}" data-rule="${f.rule}" title="${e?'Corrigé : cliquer pour annuler':'Cliquer pour compter comme corrigé'}"><i class="ti ${e?'ti-circle-check':f.icon}"></i>${esc(f.text)}</button>${stepper}</span>`;
+}
+
+function manualFixesHtml(row){
+  const flagRules=new Set(row.flags.filter(f=>f.sev!=='info').map(f=>f.rule));
+  const chips=S.log.filter(e=>e.halId===row.halId&&!flagRules.has(e.rule)).map(e=>
+    `<span class="fix-chip">${esc(FIX_LABELS[e.rule]||e.rule)} ×${e.qty}<button class="fix-remove" data-id="${esc(row.halId)}" data-rule="${esc(e.rule)}" title="Retirer">✕</button></span>`).join('');
+  const opts=Object.keys(FIX_LABELS).map(k=>`<option value="${k}">${esc(FIX_LABELS[k])}</option>`).join('');
+  return `<div class="fix-manual"><span class="fix-manual-lbl">Autres corrections</span>${chips}<select class="fix-add" data-id="${esc(row.halId)}"><option value="">+ Ajouter…</option>${opts}</select></div>`;
+}
+
+function renderLogPop(){
+  const pop=document.getElementById('log-pop');
+  const byType={};
+  S.log.forEach(e=>{byType[e.rule]=(byType[e.rule]||0)+e.qty;});
+  const keys=Object.keys(FIX_LABELS).filter(k=>byType[k]).concat(Object.keys(byType).filter(k=>!(k in FIX_LABELS)));
+  const rows=keys.map(k=>`<div class="log-row"><span>${esc(FIX_LABELS[k]||k)}</span><b>${byType[k]}</b></div>`).join('');
+  pop.innerHTML=`
+    <div style="font-weight:600;margin-bottom:6px;">Corrections de la session</div>
+    ${rows||'<div style="color:var(--text-2);padding:6px 0;">Aucune correction comptée pour le moment.</div>'}
+    <div class="log-total"><span>Total</span><span>${totalFixes()}</span></div>
+    <div class="log-actions">
+      <button class="btn-sm" id="log-copy"><i class="ti ti-copy"></i>Copier le bilan (pour Excel)</button>
+      <button class="btn-sm" id="log-csv"><i class="ti ti-download"></i>Exporter le détail (CSV)</button>
+      <button class="btn-sm" id="log-reset"><i class="ti ti-rotate"></i>Remettre à zéro</button>
+    </div>`;
+
+  document.getElementById('log-copy').addEventListener('click',e=>{
+    const txt=keys.map(k=>`${FIX_LABELS[k]||k}\t${byType[k]}`).concat([`Total\t${totalFixes()}`]).join('\n');
+    if(navigator.clipboard) navigator.clipboard.writeText(txt);
+    e.currentTarget.innerHTML='<i class="ti ti-check"></i>Copié';
+  });
+  document.getElementById('log-csv').addEventListener('click',()=>{
+    const q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+    const lines=[['Date','Heure','HAL ID','Titre','Type de correction','Quantité'].map(q).join(';')];
+    [...S.log].sort((a,b)=>a.ts<b.ts?-1:1).forEach(e=>{
+      const r=S.results.find(x=>x.halId===e.halId);
+      const dt=new Date(e.ts);
+      lines.push([dt.toLocaleDateString('fr-FR'),dt.toLocaleTimeString('fr-FR'),e.halId,r?r.titre:'',FIX_LABELS[e.rule]||e.rule,e.qty].map(q).join(';'));
+    });
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob(['\uFEFF'+lines.join('\n')],{type:'text/csv;charset=utf-8;'}));
+    a.download=`corrections_${S.collection||'hal'}_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  });
+  document.getElementById('log-reset').addEventListener('click',()=>{
+    if(!confirm('Remettre le compteur de corrections à zéro ?')) return;
+    S.log=[];
+    renderTable();
+  });
+}
+
+document.getElementById('st-corr-wrap').addEventListener('click',()=>{
+  const pop=document.getElementById('log-pop');
+  pop.classList.toggle('open');
+  if(pop.classList.contains('open')) renderLogPop();
+});
+document.addEventListener('click',e=>{
+  const pop=document.getElementById('log-pop');
+  if(!pop.contains(e.target)&&!document.getElementById('st-corr-wrap').contains(e.target)) pop.classList.remove('open');
+});
+
 // ── Render ─────────────────────────────────────────────────────────────────
 function badgeHtml(f,lg=false){
   const s=lg?'font-size:12px;padding:4px 10px;':'';
@@ -733,7 +858,7 @@ function renderTable(){
     const detTr=document.createElement('tr');
     detTr.className='detail-row';
 
-    const allFlags=row.flags.map(f=>badgeHtml(f,true)).join('');
+    const allFlags=row.flags.map(f=>fixBadge(row,f)).join('');
 
     const DUP_MAX=5;
     const dupOpen=S.dupExpanded.has(row.halId);
@@ -770,6 +895,7 @@ function renderTable(){
     detTr.innerHTML=`<td colspan="7"><div class="detail-panel${isOpen?' open':''}">
       <div class="detail-inner">
         <div class="detail-flags">${allFlags||'<span style="font-size:12px;color:var(--text-2);">Aucun problème détecté</span>'}</div>
+        ${manualFixesHtml(row)}
         ${doublonHtml}
         <div class="detail-meta">
           <div class="meta-field"><label>Titre</label><span>${esc(row.titre)||'—'}</span></div>
@@ -805,7 +931,33 @@ function renderTable(){
     renderTable();
     updateStats();
   }));
-  
+    tbody.querySelectorAll('.fix-toggle').forEach(btn=>btn.addEventListener('click',e=>{
+    e.stopPropagation();
+    const {id,rule}=btn.dataset;
+    const row=S.results.find(r=>r.halId===id);
+    if(findFix(id,rule)) setFix(id,rule,0); else setFix(id,rule,defaultFixQty(row,rule));
+    renderTable();
+  }));
+  tbody.querySelectorAll('.fix-step').forEach(btn=>btn.addEventListener('click',e=>{
+    e.stopPropagation();
+    const {id,rule,delta}=btn.dataset;
+    const cur=(findFix(id,rule)||{qty:0}).qty;
+    setFix(id,rule,Math.max(1,cur+Number(delta)));
+    renderTable();
+  }));
+  tbody.querySelectorAll('.fix-add').forEach(sel=>sel.addEventListener('change',e=>{
+    e.stopPropagation();
+    if(!sel.value) return;
+    const id=sel.dataset.id;
+    const cur=(findFix(id,sel.value)||{qty:0}).qty;
+    setFix(id,sel.value,cur+1);
+    renderTable();
+  }));
+  tbody.querySelectorAll('.fix-remove').forEach(btn=>btn.addEventListener('click',e=>{
+    e.stopPropagation();
+    setFix(btn.dataset.id,btn.dataset.rule,0);
+    renderTable();
+  }));
   tbody.querySelectorAll('.btn-crossref').forEach(btn=>btn.addEventListener('click',e=>{
     e.stopPropagation();
     runCrossref(btn.dataset.id);
@@ -834,6 +986,8 @@ function updateStats(){
   const nDone=S.results.filter(r=>S.done.has(r.halId)).length;
   const nTodo=S.results.filter(r=>!S.done.has(r.halId)&&(!S.onlyFlags||r.flags.length>0)).length;
   document.getElementById('st-done').textContent=nDone;
+  document.getElementById('st-corr').textContent=totalFixes();
+  if(document.getElementById('log-pop').classList.contains('open')) renderLogPop();
   document.getElementById('cnt-todo').textContent=nTodo;
   document.getElementById('cnt-done').textContent=nDone;
   document.getElementById('footer-count').textContent=tot?`${S.view==='done'?nDone:nTodo} notice(s) affichée(s)`:'';
@@ -929,6 +1083,7 @@ function buildSession(){
     to:document.getElementById('inp-to').value,
     savedAt:new Date().toISOString(),
     done:[...S.done],
+    log:S.log,
     results:S.results.map(r=>({
       n:r.n,halId:r.halId,titre:r.titre,type:r.type,date:r.date,
       flags:r.flags,doublons:r.doublons,unaff:r.unaff,
@@ -947,6 +1102,7 @@ function buildSession(){
 function applySession(data){
   S.results=Array.isArray(data.results)?data.results:[];
   S.done=new Set(data.done||[]);
+  S.log=Array.isArray(data.log)?data.log:[];
   S.collection=data.collection||'';
   S.openRow=null;
   S.view='todo';
@@ -960,7 +1116,7 @@ function applySession(data){
 
 // ── Sauvegarde automatique dans le navigateur ──
 function saveNow(){
-  if(skipSave||S.running||(!S.results.length&&!S.done.size)) return;
+  if(skipSave||S.running||(!S.results.length&&!S.done.size&&!S.log.length)) return;
   try{
     localStorage.setItem(LS_KEY,JSON.stringify(buildSession()));
   }catch(e){
