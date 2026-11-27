@@ -103,7 +103,7 @@ input[type=text]:focus,input[type=date]:focus{border-color:var(--accent);box-sha
 #empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-2);gap:8px;}
 #empty i{font-size:40px;color:var(--text-3);}
 
-table{width:100%;border-collapse:collapse;}
+table{width:100%;border-collapse:collapse;table-layout:fixed;}
 
 thead th{position:sticky;top:0;z-index:10;background:var(--surface);padding:8px 10px;text-align:left;font-size:11px;font-weight:500;color:var(--text-2);border-bottom:1px solid var(--border);cursor:pointer;user-select:none;white-space:nowrap;}
 thead th:hover{color:var(--text);}
@@ -120,14 +120,19 @@ td.c-chev{width:28px;padding:8px 4px 8px 10px;}
 td.c-chev i{font-size:11px;color:var(--text-3);transition:transform .2s;}
 .main-row.open td.c-chev i{transform:rotate(90deg);}
 
-td.c-id{font-size:11px;font-family:'Courier New',monospace;color:var(--accent);white-space:nowrap;}
-td.c-titre{font-size:12px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-td.c-type span{font-size:11px;background:var(--bg);border:1px solid var(--border);padding:2px 7px;border-radius:4px;}
+/* après */
+td.c-id{font-size:11px;font-family:'Courier New',monospace;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+td.c-titre{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+td.c-type{white-space:nowrap;overflow:hidden;}
+td.c-type span{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;font-size:11px;background:var(--bg);border:1px solid var(--border);padding:2px 7px;border-radius:4px;}
 td.c-date{font-size:11px;color:var(--text-2);white-space:nowrap;}
-td.c-flags{white-space:nowrap;}
+td.c-flags{white-space:normal;}
+td.c-flags .badge{max-width:100%;margin:0 3px 3px 0;vertical-align:top;}
+td.c-flags .b-txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 td.c-act{text-align:right;padding-right:14px;white-space:nowrap;}
 
 .badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:5px;margin-right:3px;white-space:nowrap;font-family:inherit;}
+.badge i{flex-shrink:0;}
 .badge.danger{background:var(--danger-bg);color:var(--danger-text);}
 .badge.warning{background:var(--warning-bg);color:var(--warning-text);}
 .badge.info{background:var(--info-bg);color:var(--info-text);}
@@ -136,6 +141,10 @@ td.c-act{text-align:right;padding-right:14px;white-space:nowrap;}
 .btn-done{font-size:11px;padding:4px 9px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);cursor:pointer;font-family:inherit;color:var(--text-2);display:inline-flex;align-items:center;gap:4px;transition:background .1s,color .1s,border-color .1s;}
 .btn-done:hover{background:var(--success-bg);color:var(--success-text);border-color:var(--success-border);}
 
+@media (max-width:1250px){
+  thead th:nth-child(4),thead th:nth-child(5),td.c-type,td.c-date{display:none;}
+}
+
 /* ── Detail panel ── */
 .detail-row td{padding:0;}
 .detail-panel{overflow:hidden;max-height:0;transition:max-height .25s ease;background:#FAFBFC;border-bottom:1px solid var(--border);}
@@ -143,7 +152,7 @@ td.c-act{text-align:right;padding-right:14px;white-space:nowrap;}
 .detail-inner{padding:12px 14px 14px 38px;}
 
 .detail-flags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;}
-.detail-flags .badge{font-size:12px;padding:4px 10px;}
+.detail-flags .badge{font-size:12px;padding:4px 10px;white-space:normal;text-align:left;overflow-wrap:anywhere;}
 
 .doublon-box{background:var(--warning-bg);border:1px solid var(--warning-border);border-radius:var(--radius);padding:9px 12px;margin-bottom:10px;}
 .doublon-title{font-size:11px;font-weight:500;color:var(--warning-text);margin-bottom:5px;display:flex;align-items:center;gap:5px;}
@@ -176,7 +185,7 @@ td.c-act{text-align:right;padding-right:14px;white-space:nowrap;}
 .log-row{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);}
 .log-total{display:flex;justify-content:space-between;font-weight:600;padding:6px 0 8px;}
 .log-actions{display:flex;flex-direction:column;gap:6px;margin-top:4px;}
-.fix-wrap{display:inline-flex;align-items:center;gap:4px;margin-right:6px;}
+.fix-wrap{display:inline-flex;align-items:center;gap:4px;margin-right:6px;max-width:100%;}
 .fix-toggle{border:none;cursor:pointer;}
 .fix-toggle:hover{filter:brightness(.96);}
 .stepper{display:inline-flex;align-items:center;gap:2px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1px 3px;font-size:11px;}
@@ -189,6 +198,7 @@ td.c-act{text-align:right;padding-right:14px;white-space:nowrap;}
 .fix-add{font-family:inherit;font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text-2);cursor:pointer;}
 
 .detail-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px 24px;margin-bottom:12px;font-size:12px;}
+.meta-field{min-width:0;overflow-wrap:anywhere;}
 .meta-field label{font-size:10px;color:var(--text-2);display:block;margin-bottom:2px;font-weight:500;}
 .meta-field a{color:var(--accent);text-decoration:none;}
 .meta-field a:hover{text-decoration:underline;}
@@ -285,11 +295,11 @@ td.c-act{text-align:right;padding-right:14px;white-space:nowrap;}
         <tr>
           <th class="no-sort" style="width:28px;"></th>
           <th data-col="halId" style="width:130px;">HAL ID</th>
-          <th data-col="titre">Titre</th>
+          <th data-col="titre" style="width:22%;">Titre</th>
           <th data-col="type" style="width:110px;">Type</th>
           <th data-col="date" style="width:100px;">Date dépôt</th>
           <th class="no-sort">Flags</th>
-          <th class="no-sort" style="width:80px;"></th>
+          <th class="no-sort" style="width:110px;"></th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
@@ -349,6 +359,11 @@ const S = {
   collection:'',
   running:false,
 };
+
+// Écran étroit : les colonnes Type et Date sont masquées (voir le CSS @media)
+const MQ_NARROW=window.matchMedia('(max-width:1250px)');
+const nCols=()=>MQ_NARROW.matches?5:7;
+MQ_NARROW.addEventListener('change',()=>renderTable());
 
 // ── Utils ──────────────────────────────────────────────────────────────────
 const arr = v => v == null ? [] : Array.isArray(v) ? v : [v];
@@ -796,7 +811,7 @@ document.addEventListener('click',e=>{
 // ── Render ─────────────────────────────────────────────────────────────────
 function badgeHtml(f,lg=false){
   const s=lg?'font-size:12px;padding:4px 10px;':'';
-  return `<span class="badge ${f.sev}" style="${s}"><i class="ti ${f.icon}"></i>${esc(f.text)}</span>`;
+    return `<span class="badge ${f.sev}" style="${s}" title="${esc(f.text)}"><i class="ti ${f.icon}"></i><span class="b-txt">${esc(f.text)}</span></span>`;
 }
 
 function renderTable(){
@@ -817,7 +832,7 @@ function renderTable(){
   tbody.innerHTML='';
 
   if(!display.length){
-    tbody.innerHTML=`<tr><td colspan="7" style="padding:40px;text-align:center;color:var(--text-2);">${S.view==='done'?'Aucune notice traitée pour le moment.':'Aucune notice à afficher.'}</td></tr>`;
+    tbody.innerHTML=`<tr><td colspan="${nCols()}" style="padding:40px;text-align:center;color:var(--text-2);">${S.view==='done'?'Aucune notice traitée pour le moment.':'Aucune notice à afficher.'}</td></tr>`;
     updateStats();
     return;
   }
@@ -892,7 +907,7 @@ function renderTable(){
     const journal=first(doc.journalTitle_s)||first(doc.publicationTitle_s)||'—';
     const lang=first(doc.language_s)||'—';
 
-    detTr.innerHTML=`<td colspan="7"><div class="detail-panel${isOpen?' open':''}">
+    detTr.innerHTML=`<td colspan="${nCols()}"><div class="detail-panel${isOpen?' open':''}">
       <div class="detail-inner">
         <div class="detail-flags">${allFlags||'<span style="font-size:12px;color:var(--text-2);">Aucun problème détecté</span>'}</div>
         ${manualFixesHtml(row)}
