@@ -159,6 +159,7 @@ td.c-act{text-align:right;padding-right:14px;white-space:nowrap;}
 .doublon-item{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0;border-top:1px solid var(--warning-border);margin-top:3px;}
 .doublon-item a{color:var(--accent);text-decoration:none;font-size:11px;display:flex;align-items:center;gap:3px;}
 .doublon-item a:hover{text-decoration:underline;}
+.doublon-item a.dup-link{display:inline-flex;font-size:12px;font-weight:600;}
 .doublon-list{max-height:260px;overflow-y:auto;}
 .dup-toggle{margin-top:6px;padding:4px 10px;border:1px solid var(--warning-border);border-radius:var(--radius);background:var(--surface);color:var(--warning-text);font-family:inherit;font-size:11px;cursor:pointer;}
 .dup-toggle:hover{background:var(--warning-bg);}
@@ -885,8 +886,7 @@ function renderTable(){
         <div class="doublon-list">
         ${dupShown.map(d=>`
           <div class="doublon-item">
-            <div><b>${esc(d.halId)}</b><br><span style="color:var(--text-2);font-size:11px;">${esc(d.title.slice(0,80))}</span></div>
-            <a href="https://hal.science/${esc(d.halId)}" target="_blank">Voir <i class="ti ti-external-link"></i></a>
+            <div><a class="dup-link" href="https://hal.science/${esc(d.halId)}" target="_blank" rel="noopener" title="Ouvrir la notice sur HAL">${esc(d.halId)}<i class="ti ti-external-link"></i></a><br><span style="color:var(--text-2);font-size:11px;">${esc(d.title.slice(0,80))}</span></div>
           </div>`).join('')}
         </div>
         ${dupHidden>0?`<button class="dup-toggle" data-id="${esc(row.halId)}">${dupOpen?'Réduire la liste':`Afficher les ${dupHidden} autres`}</button>`:''}
